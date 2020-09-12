@@ -5,7 +5,9 @@
 // but feel free to use whatever libraries or frameworks you'd like through `package.json`.
 const express = require("express");
 const sqlite = require("sqlite3");
+const bodyParser = require('body-parser');
 const app = express();
+app.use(bodyParser.urlencoded({ extended: true }));
 let database;
 
 database = new sqlite.Database("database.db", function(err) {
@@ -34,7 +36,7 @@ app.get("/*", (request, response) => {
   // express helps us take JS objects and send them as JSON
   var fullUrl = request.protocol + '://' + request.get('host') + request.originalUrl;
   if(fullUrl.includes("/favicon.ico")) return;
-  if(fullUrl.includes("/api.php")) return;
+  if(fullUrl.includes("/api/")) return;
   database.serialize(function() {
     database.all(`SELECT * FROM urls WHERE shorturl = '${request.originalUrl.replace("/", "")}'`, function(err, result) {
       if(result.length > 0){
@@ -47,6 +49,21 @@ app.get("/*", (request, response) => {
     })
   })
 });
+
+app.post("/api/", (request, response) => {
+  let longurl = request.body.longurl;
+  let shorturl = request.body.shorturl;
+  database.serialize(function() {
+    database.all(`SELECT * FROM urls WHERE shorturl = '${shorturl}'`, function(err, result) {
+      if(result.length > 0){
+        response.sendStatus(500);
+      }else {
+        response.sendStatus(200);
+        database.run(`INSERT INTO urls (shorturl, longurl) VALUES ('${shorturl}', '${longurl}')`);
+      }
+    })
+  })
+})
 
 // listen for requests :)
 const listener = app.listen(process.env.PORT, () => {
